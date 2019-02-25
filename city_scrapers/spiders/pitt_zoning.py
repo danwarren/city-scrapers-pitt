@@ -1,25 +1,47 @@
-from city_scrapers_core.constants import NOT_CLASSIFIED, BOARD
+"""
+        Copyright (C) 2019 Daniel Warren For cityscrapers Pittsburgh
+"""
+
+import re
+from datetime import datetime
+from tempfile import TemporaryFile
+from urllib.request import urlopen
+
+from city_scrapers_core.constants import BOARD
 from city_scrapers_core.items import Meeting
 from city_scrapers_core.spiders import CityScrapersSpider
 from PyPDF2 import PdfFileReader
-from urllib.request import urlopen
-from tempfile import TemporaryFile
-import re
 
+pageRE1 = re.compile(
+    r'(?P<title>[\s\S]*)(?P<date>'
+    r'(?P<month>J(anuary|u(ne|ly))|February|Ma(rch|y)|A(pril|ugust)|(((Sept|Nov|Dec)em)|Octo)ber)'
+    r'\s+(?P<day>\d{1,2})\,\s+(?P<year>\d{4}))[\s\S]?(Date|Time)\sof\sHearing:'
+)
 
-pageRE1 = re.compile('(?P<title>[\s\S]*)(?P<date>(?P<month>J(anuary|u(ne|ly))|February|Ma(rch|y)|A(pril|ugust)|(((Sept|Nov|Dec)em)|Octo)ber)\s+(?P<day>\d{1,2})\,\s+(?P<year>\d{4}))')
+pageRE2 = re.compile(
+    r'(?P<hour>\d{1,2})\:(?P<minute>\d{2})(?P<description>[\s\S]*?)\n{8,50}'
+    r'(?P<address>(?P<address1>.*?)(?P<address2>\d{1,9}[\s\S]*\d{5}))?'
+)
 
-pageRE2 = re.compile('(?P<start>\d{1}\:\d{2})(?P<description>[\s\S]*?)\n{4,50}(?P<address>.*\d{1,9}[\s\S]*\d{5})?')
-
-# from enchant import Dict
-# d = Dict("en_US")
+monthLookup = {
+    'january': 1,
+    'february': 2,
+    'march': 3,
+    'april': 4,
+    'may': 5,
+    'june': 6,
+    'july': 7,
+    'august': 8,
+    'september': 9,
+    'october': 10,
+    'november': 11,
+    'december': 12,
+}
 
 
 def PDFtxtFromURL(url):
     """ Extract the text from all pages of a web hosted PDF
         Return a dict with cleaned up strings for each page
-
-        Copyright (C) 2019 Daniel Warren For cityscrapers Pittsburgh
     """
     output = {}
     tempFilePDF = TemporaryFile()
@@ -44,7 +66,7 @@ def PDFtxtFromURL(url):
                         final += word + " "
             Page += final.strip() + '\n'
         output[PDFPageNum] = Page
-    return(output)
+    return (output)
 
 
 class PittZoningSpider(CityScrapersSpider):
@@ -85,12 +107,12 @@ class PittZoningSpider(CityScrapersSpider):
 
     def _parse_title(self, item):
         """Parse or generate meeting title."""
-        title = pageRE(item).group('title')
+        title = pageRE1(item).group('title')
         return title
 
     def _parse_description(self, item):
         """Parse or generate meeting description."""
-        description = pageRE(item).group('description')
+        description = pageRE2(item).group('description')
         return description
 
     def _parse_classification(self, item):
@@ -99,7 +121,13 @@ class PittZoningSpider(CityScrapersSpider):
 
     def _parse_start(self, item):
         """Parse start datetime as a naive datetime object."""
-        start = pageRE(item).group('start')
+        hour = pageRE2(item).group('hour')
+        minute = pageRE2(item).group('minute')
+        year = pageRE1(item).group('year')
+        monthWord = pageRE1(item).group('month')
+        month = monthLookup(monthWord.lower())
+        day = pageRE1(item).group('day')
+        start = datetime(year, month, day, hour, minute)
         return start
 
     def _parse_end(self, item):
@@ -116,10 +144,11 @@ class PittZoningSpider(CityScrapersSpider):
 
     def _parse_location(self, item):
         """Parse or generate location."""
-        address = pageRE(item).group('address')
+        address = pageRE2(item).group('address2')
+        name = pageRE2(item).group('address1')
         return {
             "address": address,
-            "name": "",
+            "name": name,
         }
 
     def _parse_links(self, item):
