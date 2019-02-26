@@ -35,6 +35,7 @@ pydispatcher==2.0.5
 pyflakes==2.0.0
 pyhamcrest==1.9.0
 pyopenssl==19.0.0
+PyPDF2==1.26.0
 pyrsistent==0.14.9
 pytest==4.1.1
 python-dateutil==2.7.5

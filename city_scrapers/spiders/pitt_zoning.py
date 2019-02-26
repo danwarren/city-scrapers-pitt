@@ -11,6 +11,7 @@ from city_scrapers_core.constants import BOARD
 from city_scrapers_core.items import Meeting
 from city_scrapers_core.spiders import CityScrapersSpider
 from PyPDF2 import PdfFileReader
+from scrapy import Request
 
 pageRE1 = re.compile(
     r'(?P<title>[\s\S]*)(?P<date>'
@@ -69,6 +70,31 @@ def PDFtxtFromURL(url):
     return (output)
 
 
+def PDFtxtFromResponse(response):
+    """ Extract the text from all pages of a web hosted PDF
+        Return a dict with cleaned up strings for each page
+    """
+    output = {}
+    tempFilePDF = TemporaryFile()
+    tempFilePDF.write(response.body)
+    PFR = PdfFileReader(tempFilePDF)
+    for PDFPageNum in range(PFR.getNumPages()):
+        PDFPage = PFR.getPage(PDFPageNum)
+        rawPage = PDFPage.extractText().split('\n')
+        Page = ""
+        for i in rawPage:
+            line = i.strip()
+            final = ""
+            if line:
+                for j in line.split():
+                    word = j.strip()
+                    if word:
+                        final += word + " "
+            Page += final.strip() + '\n'
+        output[PDFPageNum] = Page
+    return(output)
+
+
 class PittZoningSpider(CityScrapersSpider):
     name = "pitt_zoning"
     agency = "Pittsburgh Zoning Board of Adjustment"
@@ -79,40 +105,48 @@ class PittZoningSpider(CityScrapersSpider):
     def parse(self, response):
         """
         `parse` should always `yield` Meeting items.
-
         Change the `_parse_id`, `_parse_name`, etc methods to fit your scraping
         needs.
         """
-        for item in response.xpath('//tr[@class="data"]//a/@href'):
-            Pages = PDFtxtFromURL(item)
-            firstPage = Pages[0]
-            for PageNum, PageText in Pages:
-                meeting = Meeting(
-                    title=self._parse_title(PageText),
-                    description=self._parse_description(PageText),
-                    classification=self._parse_classification(PageText),
-                    start=self._parse_start(PageText),
-                    end=self._parse_end(PageText),
-                    all_day=self._parse_all_day(PageText),
-                    time_notes=self._parse_time_notes(item),
-                    location=self._parse_location(firstPage),
-                    links=self._parse_links(item),
-                    source=self._parse_source(response),
-                )
+        self.logger.debug('Parse function called on %s', response.url)
+        for item in response.xpath('//tr[@class=\'data\']//a/@href'):
+            thisItem = item.extract()
+            self.logger.debug('xpath found %s', thisItem)
+            request = Request(thisItem, callback=self.parse_PDF)
+            yield request
 
-                meeting["status"] = self._get_status(meeting)
-                meeting["id"] = self._get_id(meeting)
-
-                yield meeting
+    def parse_PDF(self, response):
+        """
+        `parse` should always `yield` Meeting items.
+        """
+        self.logger.debug('Parse_PDF function called on %s', response.url)
+        Pages = PDFtxtFromResponse(response)
+        firstPage = Pages[0]
+        for PageNum, PageText in Pages.items():
+            meeting = Meeting(
+                title=self._parse_title(PageText),
+                description=self._parse_description(PageText),
+                classification=self._parse_classification(PageText),
+                start=self._parse_start(PageText),
+                end=self._parse_end(PageText),
+                all_day=self._parse_all_day(PageText),
+                time_notes=self._parse_time_notes(PageText),
+                location=self._parse_location(firstPage),
+                links=self._parse_links(response),
+                source=self._parse_source(response),
+            )
+            meeting["status"] = self._get_status(meeting)
+            meeting["id"] = self._get_id(meeting)
+            yield meeting
 
     def _parse_title(self, item):
         """Parse or generate meeting title."""
-        title = pageRE1(item).group('title')
+        title = pageRE1.search(item).group('title')
         return title
 
     def _parse_description(self, item):
         """Parse or generate meeting description."""
-        description = pageRE2(item).group('description')
+        description = pageRE2.search(item).group('description')
         return description
 
     def _parse_classification(self, item):
@@ -121,12 +155,14 @@ class PittZoningSpider(CityScrapersSpider):
 
     def _parse_start(self, item):
         """Parse start datetime as a naive datetime object."""
-        hour = pageRE2(item).group('hour')
-        minute = pageRE2(item).group('minute')
-        year = pageRE1(item).group('year')
-        monthWord = pageRE1(item).group('month')
-        month = monthLookup(monthWord.lower())
-        day = pageRE1(item).group('day')
+        S1 = pageRE1.search(item).groupdict()
+        S2 = pageRE2.search(item).groupdict()
+        hour = int(S2['hour'])
+        minute = int(S2['minute'])
+        year = int(S1['year'])
+        monthWord = S1['month']
+        month = monthLookup[monthWord.lower()]
+        day = int(S1['day'])
         start = datetime(year, month, day, hour, minute)
         return start
 
@@ -144,8 +180,9 @@ class PittZoningSpider(CityScrapersSpider):
 
     def _parse_location(self, item):
         """Parse or generate location."""
-        address = pageRE2(item).group('address2')
-        name = pageRE2(item).group('address1')
+        S2 = pageRE2.search(item).groupdict()
+        address = S2['address2']
+        name = S2['address1']
         return {
             "address": address,
             "name": name,
