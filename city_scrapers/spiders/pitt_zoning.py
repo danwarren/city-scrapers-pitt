@@ -40,36 +40,6 @@ monthLookup = {
 }
 
 
-def PDFtxtFromURL(url):
-    """ Extract the text from all pages of a web hosted PDF
-        Return a dict with cleaned up strings for each page
-    """
-    output = {}
-    tempFilePDF = TemporaryFile()
-    urlHandle = urlopen(url)
-    while True:
-        data = urlHandle.read(16384)
-        if not data:
-            break
-        tempFilePDF.write(data)
-    PFR = PdfFileReader(tempFilePDF)
-    for PDFPageNum in range(PFR.getNumPages()):
-        PDFPage = PFR.getPage(PDFPageNum)
-        rawPage = PDFPage.extractText().split('\n')
-        Page = ""
-        for i in rawPage:
-            line = i.strip()
-            final = ""
-            if line:
-                for j in line.split():
-                    word = j.strip()
-                    if word:
-                        final += word + " "
-            Page += final.strip() + '\n'
-        output[PDFPageNum] = Page
-    return (output)
-
-
 def PDFtxtFromResponse(response):
     """ Extract the text from all pages of a web hosted PDF
         Return a dict with cleaned up strings for each page
@@ -105,8 +75,8 @@ class PittZoningSpider(CityScrapersSpider):
     def parse(self, response):
         """
         `parse` should always `yield` Meeting items.
-        Change the `_parse_id`, `_parse_name`, etc methods to fit your scraping
-        needs.
+        in this case we find agenda PDFs and cllback to
+        parse_PDF which yeilds meetings.
         """
         self.logger.debug('Parse function called on %s', response.url)
         for item in response.xpath('//tr[@class=\'data\']//a/@href'):
