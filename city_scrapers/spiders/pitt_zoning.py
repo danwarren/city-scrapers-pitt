@@ -92,7 +92,7 @@ def PDFtxtFromResponse(response):
                         final += word + " "
             Page += final.strip() + '\n'
         output[PDFPageNum] = Page
-    return(output)
+    return (output)
 
 
 class PittZoningSpider(CityScrapersSpider):
