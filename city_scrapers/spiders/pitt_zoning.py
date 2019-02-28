@@ -206,9 +206,9 @@ class PittZoningSpider(CityScrapersSpider):
                 month = monthLookup[monthWord.lower()]
                 day = int(S1['day'])
             else:
-                year = 0
-                month = 0
-                day = 0
+                year = 1
+                month = 1
+                day = 1
         start = datetime(year, month, day, hour, minute)
         return start
 
