@@ -5,7 +5,6 @@
 import re
 from datetime import datetime
 from tempfile import TemporaryFile
-from urllib.request import urlopen
 
 from city_scrapers_core.constants import BOARD
 from city_scrapers_core.items import Meeting
@@ -14,14 +13,54 @@ from PyPDF2 import PdfFileReader
 from scrapy import Request
 
 pageRE1 = re.compile(
+    r'(?P<before>[\s\S]*?)?'
     r'(?P<title>[\s\S]*)(?P<date>'
     r'(?P<month>J(anuary|u(ne|ly))|February|Ma(rch|y)|A(pril|ugust)|(((Sept|Nov|Dec)em)|Octo)ber)'
     r'\s+(?P<day>\d{1,2})\,\s+(?P<year>\d{4}))[\s\S]?(Date|Time)\sof\sHearing:'
+    r'(?P<after>[\s\S]*)?'
+)
+
+dateRE = re.compile(
+    r'(?P<before>[\s\S]*?)?'
+    r'(?P<date>'
+    r'(?P<month>J(anuary|u(ne|ly))|February|Ma(rch|y)|'
+    r'A(pril|ugust)|(((Sept|Nov|Dec)em)|Octo)ber)'
+    r'\s+(?P<day>\d{1,2})\,\s+(?P<year>\d{4}))'
+    r'(?P<after>[\s\S]*)?'
+)
+
+date2RE = re.compile(
+    r'(?P<before>[\s\S]*?)?'
+    r'(?P<date>'
+    r'(?P<month>Jan|Feb|Mar|Apr|May|Jun|Jul|'
+    r'Aug|Sep|Oct|Nov|Dec)\s+'
+    r'(?P<day>\d{1,2})\,?\s+(?P<year>\d{4}))'
+    r'(?P<after>[\s\S]*)?'
 )
 
 pageRE2 = re.compile(
+    r'(?P<before>[\s\S]*?)?'
     r'(?P<hour>\d{1,2})\:(?P<minute>\d{2})(?P<description>[\s\S]*?)\n{8,50}'
     r'(?P<address>(?P<address1>.*?)(?P<address2>\d{1,9}[\s\S]*\d{5}))?'
+    r'(?P<after>[\s\S]*)?'
+)
+
+descriptionRE = re.compile(
+    r'(?P<before>[\s\S]*?)?'
+    r'\:(?P<description>[\s\S]*?)\n{8,50}'
+    r'(?P<after>[\s\S]*)?'
+)
+
+timeRE = re.compile(
+    r'(?P<before>[\s\S]*?)?'
+    r'(?P<time>(?P<hour>\d{1,2})\:(?P<minute>\d{2}))'
+    r'(?P<after>[\s\S]*)?'
+)
+
+addressRE = re.compile(
+    r'(?P<before>[\s\S]*?)?'
+    r'(?P<address>\d{3,9}[\s\S]*?\d{5})?'
+    r'(?P<after>[\s\S]*)?'
 )
 
 monthLookup = {
@@ -111,12 +150,24 @@ class PittZoningSpider(CityScrapersSpider):
 
     def _parse_title(self, item):
         """Parse or generate meeting title."""
-        title = pageRE1.search(item).group('title')
+        REout = pageRE1.search(item)
+        if REout:
+            title = REout.group('title')
+        else:
+            title = 'ZONING BOARD OF ADJUSTMENT HEARING AGENDA'
         return title
 
     def _parse_description(self, item):
         """Parse or generate meeting description."""
-        description = pageRE2.search(item).group('description')
+        REout = pageRE2.search(item)
+        if REout:
+            description = REout.group('description')
+        else:
+            REout = descriptionRE.search(item)
+            if REout:
+                description = REout.group('description')
+            else:
+                description = 'NO MATCH -- FULL TEXT: ' + item
         return description
 
     def _parse_classification(self, item):
@@ -125,14 +176,39 @@ class PittZoningSpider(CityScrapersSpider):
 
     def _parse_start(self, item):
         """Parse start datetime as a naive datetime object."""
-        S1 = pageRE1.search(item).groupdict()
-        S2 = pageRE2.search(item).groupdict()
-        hour = int(S2['hour'])
-        minute = int(S2['minute'])
-        year = int(S1['year'])
-        monthWord = S1['month']
-        month = monthLookup[monthWord.lower()]
-        day = int(S1['day'])
+        REout = pageRE2.search(item)
+        if REout:
+            S2 = REout.groupdict()
+            hour = int(S2['hour'])
+            minute = int(S2['minute'])
+        else:
+            REout = timeRE.search(item)
+            if REout:
+                T1 = REout.groupdict()
+                hour = int(T1['hour'])
+                minute = int(T1['minute'])
+            else:
+                hour = 0
+                minute = 0
+        REout = pageRE1.search(item)
+        if REout:
+            S1 = REout.groupdict()
+            year = int(S1['year'])
+            monthWord = S1['month']
+            month = monthLookup[monthWord.lower()]
+            day = int(S1['day'])
+        else:
+            REout = dateRE.search(item)
+            if REout:
+                S1 = REout.groupdict()
+                year = int(S1['year'])
+                monthWord = S1['month']
+                month = monthLookup[monthWord.lower()]
+                day = int(S1['day'])
+            else:
+                year = 0
+                month = 0
+                day = 0
         start = datetime(year, month, day, hour, minute)
         return start
 
@@ -150,17 +226,29 @@ class PittZoningSpider(CityScrapersSpider):
 
     def _parse_location(self, item):
         """Parse or generate location."""
-        S2 = pageRE2.search(item).groupdict()
-        address = S2['address2']
-        name = S2['address1']
+        REout = pageRE2.search(item)
+        if REout:
+            S2 = REout.groupdict()
+            address = S2['address2']
+            name = S2['address1']
+        else:
+            REout = addressRE.search(item)
+            if REout:
+                S2 = REout.groupdict()
+                address = S2['address2']
+                name = S2['address1']
+            else:
+                address = '200 Ross Street, Third Floor\nPittsburgh, Pennsylvania 15219 DEFAULT'
+                name = 'City of Pittsburgh, Department of City Planning'
         return {
             "address": address,
             "name": name,
+            "coordinates": None,
         }
 
     def _parse_links(self, item):
         """Parse or generate links."""
-        return [{"href": item, "title": item}]
+        return [{"href": item.url, "title": "Agenda PDF"}]
 
     def _parse_source(self, response):
         """Parse or generate source."""
