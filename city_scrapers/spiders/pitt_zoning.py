@@ -63,6 +63,8 @@ addressRE = re.compile(
     r'(?P<after>[\s\S]*)?'
 )
 
+fourWordsRE = re.compile(r'(?P<words>\w{4})')
+
 monthLookup = {
     'january': 1,
     'february': 2,
@@ -108,7 +110,7 @@ class PittZoningSpider(CityScrapersSpider):
     name = "pitt_zoning"
     agency = "Pittsburgh Zoning Board of Adjustment"
     timezone = "America/New_York"
-    allowed_domains = ["pittsburghpa.gov","apps.pittsburghpa.gov"]
+    allowed_domains = ["pittsburghpa.gov", "apps.pittsburghpa.gov"]
     start_urls = ["http://pittsburghpa.gov/dcp/zba-schedule"]
 
     def parse(self, response):
@@ -132,29 +134,36 @@ class PittZoningSpider(CityScrapersSpider):
         Pages = PDFtxtFromResponse(response)
         firstPage = Pages[0]
         for PageNum, PageText in Pages.items():
-            meeting = Meeting(
-                title=self._parse_title(PageText),
-                description=self._parse_description(PageText),
-                classification=self._parse_classification(PageText),
-                start=self._parse_start(PageText),
-                end=self._parse_end(PageText),
-                all_day=self._parse_all_day(PageText),
-                time_notes=self._parse_time_notes(PageText),
-                location=self._parse_location(firstPage),
-                links=self._parse_links(response),
-                source=self._parse_source(response),
-            )
-            meeting["status"] = self._get_status(meeting)
-            meeting["id"] = self._get_id(meeting)
-            yield meeting
+            REout = fourWordsRE.search(PageText)
+            if REout:
+                words = REout.group('words')
+            else:
+                words = None
+            if words:
+                meeting = Meeting(
+                    title=self._parse_title(PageText),
+                    description=self._parse_description(PageText),
+                    classification=self._parse_classification(PageText),
+                    start=self._parse_start(PageText),
+                    end=self._parse_end(PageText),
+                    all_day=self._parse_all_day(PageText),
+                    time_notes=self._parse_time_notes(PageText),
+                    location=self._parse_location(firstPage),
+                    links=self._parse_links(response),
+                    source=self._parse_source(response),
+                )
+                meeting["status"] = self._get_status(meeting)
+                meeting["id"] = self._get_id(meeting)
+                yield meeting
 
     def _parse_title(self, item):
         """Parse or generate meeting title."""
-        title =None
+        title = None
         REout = pageRE1.search(item)
         if REout:
             title = REout.group('title')
-        if not title:
+            REout = fourWordsRE.search(title)
+        if not REout:
             title = 'ZONING BOARD OF ADJUSTMENT HEARING AGENDA'
         return title
 

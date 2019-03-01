@@ -3,24 +3,18 @@ from os.path import dirname, join
 
 import pytest
 from city_scrapers_core.constants import BOARD
-#from city_scrapers_core.utils import file_response
 from freezegun import freeze_time
+from scrapy.http import HtmlResponse, Request, TextResponse
 
 from city_scrapers.spiders.pitt_zoning import PittZoningSpider
 
 
-"""
-
-This function from core needed modifications to process binary pdfs
-the import an be re-enabled once the change is accepted in core
-
-"""
-
-from scrapy.http import HtmlResponse, Request, TextResponse
-
-
 def file_response(file_name, url=None):
     """
+    This function from core needed modifications to process binary pdfs
+    the import an be re-enabled once the change is accepted in core
+    # from city_scrapers_core.utils import file_response
+
     Create a Scrapy fake HTTP response from a HTML file
     @param file_name: The relative filename from the tests directory,
                       but absolute paths are also accepted.
@@ -51,8 +45,8 @@ def file_response(file_name, url=None):
 
 
 test_response = file_response(
-        join( dirname(__file__), "files", "4496_ZBA_Agenda__01-10-19.pdf" ),
-        url = "http://apps.pittsburghpa.gov/redtail/images/4496_ZBA_Agenda__01-10-19.pdf",
+    join(dirname(__file__), "files", "4496_ZBA_Agenda__01-10-19.pdf"),
+    url="http://apps.pittsburghpa.gov/redtail/images/4496_ZBA_Agenda__01-10-19.pdf",
 )
 
 spider = PittZoningSpider()
@@ -78,14 +72,17 @@ Uncomment below
 def test_title():
     assert "zoning" in parsed_items[0]["title"].lower()
 
+
 def test_description():
     assert "\n" in parsed_items[0]["description"].lower()
 
-# def test_start():
-#     assert parsed_items[0]["start"] == datetime(2019, 1, 1, 0, 0)
+
+def test_start():
+    assert parsed_items[0]["start"] > datetime(1970, 1, 1, 0, 0)
+
 
 # def test_end():
-#     assert parsed_items[0]["end"] == datetime(2019, 1, 1, 0, 0)
+#     assert parsed_items[0]["end"] > datetime(1970, 1, 1, 0, 0)
 
 # def test_time_notes():
 #     assert parsed_items[0]["time_notes"] == "EXPECTED TIME NOTES"
@@ -96,12 +93,15 @@ def test_description():
 # def test_status():
 #     assert parsed_items[0]["status"] == "EXPECTED STATUS"
 
+
 def test_location():
     assert "" in parsed_items[0]["location"]["name"].lower()
     assert "" in parsed_items[0]["location"]["address"].lower()
 
+
 def test_source():
     assert "http" in parsed_items[0]["source"].lower()
+
 
 # def test_links():
 #     assert parsed_items[0]["links"] == [{
@@ -109,8 +109,10 @@ def test_source():
 #       "title": "EXPECTED TITLE"
 #     }]
 
+
 def test_classification():
     assert parsed_items[0]["classification"] == BOARD
+
 
 @pytest.mark.parametrize("item", parsed_items)
 def test_all_day(item):
