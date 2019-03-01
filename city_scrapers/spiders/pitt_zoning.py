@@ -108,7 +108,7 @@ class PittZoningSpider(CityScrapersSpider):
     name = "pitt_zoning"
     agency = "Pittsburgh Zoning Board of Adjustment"
     timezone = "America/New_York"
-    allowed_domains = ["pittsburghpa.gov"]
+    allowed_domains = ["pittsburghpa.gov","apps.pittsburghpa.gov"]
     start_urls = ["http://pittsburghpa.gov/dcp/zba-schedule"]
 
     def parse(self, response):
@@ -150,15 +150,17 @@ class PittZoningSpider(CityScrapersSpider):
 
     def _parse_title(self, item):
         """Parse or generate meeting title."""
+        title =None
         REout = pageRE1.search(item)
         if REout:
             title = REout.group('title')
-        else:
+        if not title:
             title = 'ZONING BOARD OF ADJUSTMENT HEARING AGENDA'
         return title
 
     def _parse_description(self, item):
         """Parse or generate meeting description."""
+        description = None
         REout = pageRE2.search(item)
         if REout:
             description = REout.group('description')
@@ -166,8 +168,8 @@ class PittZoningSpider(CityScrapersSpider):
             REout = descriptionRE.search(item)
             if REout:
                 description = REout.group('description')
-            else:
-                description = 'NO MATCH -- FULL TEXT: ' + item
+        if not description:
+            description = 'NO MATCH -- FULL TEXT: ' + item
         return description
 
     def _parse_classification(self, item):
@@ -226,6 +228,8 @@ class PittZoningSpider(CityScrapersSpider):
 
     def _parse_location(self, item):
         """Parse or generate location."""
+        address = None
+        name = None
         REout = pageRE2.search(item)
         if REout:
             S2 = REout.groupdict()
@@ -237,9 +241,10 @@ class PittZoningSpider(CityScrapersSpider):
                 S2 = REout.groupdict()
                 address = S2['address2']
                 name = S2['address1']
-            else:
-                address = '200 Ross Street, Third Floor\nPittsburgh, Pennsylvania 15219 DEFAULT'
-                name = 'City of Pittsburgh, Department of City Planning'
+        if not address:
+            address = '200 Ross Street, Third Floor\nPittsburgh, Pennsylvania 15219 DEFAULT'
+        if not name:
+            name = 'City of Pittsburgh, Department of City Planning'
         return {
             "address": address,
             "name": name,
