@@ -2,6 +2,7 @@
         Copyright (C) 2019 Daniel Warren For cityscrapers Pittsburgh
 """
 
+import os
 import re
 from datetime import datetime
 from tempfile import TemporaryFile
@@ -12,7 +13,10 @@ from city_scrapers_core.spiders import CityScrapersSpider
 from PyPDF2 import PdfFileReader
 from scrapy import Request
 
-DEBUG=False
+if os.getenv('TRAVIS') == 'DEBUG':
+    DEBUG = True
+else:
+    DEBUG = False
 
 pageRE1 = re.compile(
     r'(?P<before>[\s\S]*?)?'
@@ -124,10 +128,13 @@ class PittZoningSpider(CityScrapersSpider):
         self.logger.debug('Parse function called on %s', response.url)
         title = response.xpath('//title')[0]
         for item in response.xpath('//tr[@class=\'data\']'):
-            href = item.xpath('//a/@href')[0]
-            date = item.xpath('//td[2]')
+            href = item.xpath('.//a/@href')[0]
+            date = item.xpath('.//td[2]')
             thisDate = date.extract()
-            month, day, year = thisDate.split('/')
+            try:
+                month, day, year = thisDate.split('/')
+            except AttributeError:
+                month, day, year = (1, 1, 1)
             thisItem = href.extract()
             self.logger.debug('xpath found %s', thisItem)
             request = Request(thisItem, callback=self.parse_PDF)
