@@ -12,6 +12,8 @@ from city_scrapers_core.spiders import CityScrapersSpider
 from PyPDF2 import PdfFileReader
 from scrapy import Request
 
+DEBUG=False
+
 pageRE1 = re.compile(
     r'(?P<before>[\s\S]*?)?'
     r'(?P<title>[\s\S]*)(?P<date>'
@@ -120,11 +122,22 @@ class PittZoningSpider(CityScrapersSpider):
         parse_PDF which yeilds meetings.
         """
         self.logger.debug('Parse function called on %s', response.url)
-        for item in response.xpath('//tr[@class=\'data\']//a/@href'):
-            thisItem = item.extract()
+        title = response.xpath('//title')[0]
+        for item in response.xpath('//tr[@class=\'data\']'):
+            href = item.xpath('//a/@href')[0]
+            date = item.xpath('//td[2]')
+            thisDate = date.extract()
+            month, day, year = thisDate.split('/')
+            thisItem = href.extract()
             self.logger.debug('xpath found %s', thisItem)
             request = Request(thisItem, callback=self.parse_PDF)
+            if title:
+                request.meta['title'] = title
+            if month and day and year:
+                request.meta['date'] = datetime(year, month, day, 0, 0)
             yield request
+            if DEBUG:
+                break
 
     def parse_PDF(self, response):
         """
@@ -132,6 +145,12 @@ class PittZoningSpider(CityScrapersSpider):
         """
         self.logger.debug('Parse_PDF function called on %s', response.url)
         Pages = PDFtxtFromResponse(response)
+        default_title = response.meta['title']
+        if not default_title:
+            default_title = "Unknown Title"
+        default_date = response.meta['date']
+        if not default_date:
+            default_date = datetime(1, 1, 1, 0, 0)
         firstPage = Pages[0]
         for PageNum, PageText in Pages.items():
             REout = fourWordsRE.search(PageText)
@@ -141,10 +160,10 @@ class PittZoningSpider(CityScrapersSpider):
                 words = None
             if words:
                 meeting = Meeting(
-                    title=self._parse_title(PageText),
+                    title=self._parse_title(PageText, default_title),
                     description=self._parse_description(PageText),
                     classification=self._parse_classification(PageText),
-                    start=self._parse_start(PageText),
+                    start=self._parse_start(PageText, default_date),
                     end=self._parse_end(PageText),
                     all_day=self._parse_all_day(PageText),
                     time_notes=self._parse_time_notes(PageText),
@@ -152,11 +171,12 @@ class PittZoningSpider(CityScrapersSpider):
                     links=self._parse_links(response),
                     source=self._parse_source(response),
                 )
+                meeting["links"][0]['page'] = PageNum
                 meeting["status"] = self._get_status(meeting)
                 meeting["id"] = self._get_id(meeting)
                 yield meeting
 
-    def _parse_title(self, item):
+    def _parse_title(self, item, default_title='ZONING BOARD OF ADJUSTMENT HEARING AGENDA'):
         """Parse or generate meeting title."""
         title = None
         REout = pageRE1.search(item)
@@ -164,7 +184,7 @@ class PittZoningSpider(CityScrapersSpider):
             title = REout.group('title')
             REout = fourWordsRE.search(title)
         if not REout:
-            title = 'ZONING BOARD OF ADJUSTMENT HEARING AGENDA'
+            title = default_title
         return title
 
     def _parse_description(self, item):
@@ -185,7 +205,7 @@ class PittZoningSpider(CityScrapersSpider):
         """Parse or generate classification from allowed options."""
         return BOARD
 
-    def _parse_start(self, item):
+    def _parse_start(self, item, default_date=datetime(1, 1, 1, 0, 0)):
         """Parse start datetime as a naive datetime object."""
         REout = pageRE2.search(item)
         if REout:
@@ -199,8 +219,8 @@ class PittZoningSpider(CityScrapersSpider):
                 hour = int(T1['hour'])
                 minute = int(T1['minute'])
             else:
-                hour = 0
-                minute = 0
+                hour = default_date.hour
+                minute = default_date.minute
         REout = pageRE1.search(item)
         if REout:
             S1 = REout.groupdict()
@@ -217,9 +237,9 @@ class PittZoningSpider(CityScrapersSpider):
                 month = monthLookup[monthWord.lower()]
                 day = int(S1['day'])
             else:
-                year = 1
-                month = 1
-                day = 1
+                year = default_date.year
+                month = default_date.month
+                day = default_date.day
         start = datetime(year, month, day, hour, minute)
         return start
 
