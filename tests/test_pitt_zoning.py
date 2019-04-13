@@ -48,6 +48,8 @@ test_response = file_response(
     join(dirname(__file__), "files", "4496_ZBA_Agenda__01-10-19.pdf"),
     url="http://apps.pittsburghpa.gov/redtail/images/4496_ZBA_Agenda__01-10-19.pdf",
 )
+test_response.meta['title'] = "test meta title"
+test_response.meta['date'] = datetime(1, 1, 1, 0, 0)
 
 spider = PittZoningSpider()
 
@@ -74,7 +76,7 @@ def test_title():
 
 
 def test_description():
-    assert "\n" in parsed_items[0]["description"].lower()
+    assert len(parsed_items[0]["description"].lower()) > 20
 
 
 def test_start():

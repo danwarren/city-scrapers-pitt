@@ -13,10 +13,12 @@ from city_scrapers_core.spiders import CityScrapersSpider
 from PyPDF2 import PdfFileReader
 from scrapy import Request
 
-if os.getenv('TRAVIS') == 'DEBUG':
+DEBUG = False
+"""
+if DEBUG is True, break all parse loops after first run
+"""
+if os.getenv('TRAVIS_DEBUG_STATE') == 'DEBUG':
     DEBUG = True
-else:
-    DEBUG = False
 
 pageRE1 = re.compile(
     r'(?P<before>[\s\S]*?)?'
@@ -91,10 +93,15 @@ def PDFtxtFromResponse(response):
     """ Extract the text from all pages of a web hosted PDF
         Return a dict with cleaned up strings for each page
     """
-    output = {}
+    output = {'title':'','pages':{}}
     tempFilePDF = TemporaryFile()
     tempFilePDF.write(response.body)
     PFR = PdfFileReader(tempFilePDF)
+    try:
+        title = PFR.getDocumentInfo()['title']
+        output['title'] = title
+    except KeyError:
+        pass
     for PDFPageNum in range(PFR.getNumPages()):
         PDFPage = PFR.getPage(PDFPageNum)
         rawPage = PDFPage.extractText().split('\n')
@@ -108,7 +115,7 @@ def PDFtxtFromResponse(response):
                     if word:
                         final += word + " "
             Page += final.strip() + '\n'
-        output[PDFPageNum] = Page
+        output['pages'][PDFPageNum] = Page
     return (output)
 
 
@@ -151,7 +158,9 @@ class PittZoningSpider(CityScrapersSpider):
         `parse` should always `yield` Meeting items.
         """
         self.logger.debug('Parse_PDF function called on %s', response.url)
-        Pages = PDFtxtFromResponse(response)
+        resp = PDFtxtFromResponse(response)
+        Pages = resp['pages']
+        title = resp['title']
         default_title = response.meta['title']
         if not default_title:
             default_title = "Unknown Title"
@@ -182,6 +191,8 @@ class PittZoningSpider(CityScrapersSpider):
                 meeting["status"] = self._get_status(meeting)
                 meeting["id"] = self._get_id(meeting)
                 yield meeting
+            if DEBUG:
+                break
 
     def _parse_title(self, item, default_title='ZONING BOARD OF ADJUSTMENT HEARING AGENDA'):
         """Parse or generate meeting title."""
@@ -206,6 +217,12 @@ class PittZoningSpider(CityScrapersSpider):
                 description = REout.group('description')
         if not description:
             description = 'NO MATCH -- FULL TEXT: ' + item
+        else:
+            tmp = ""
+            for line in description:
+                if line != '\n':
+                    tmp += line
+            description = tmp
         return description
 
     def _parse_classification(self, item):

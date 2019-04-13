@@ -27,6 +27,6 @@ after_deploy:
   - scrapy combinefeeds -s LOG_ENABLED=False
 env:
       global:
-                TRAVIS: 'DEBUG'
+                TRAVIS_DEBUG_STATE: 'DEBUG'
 
 
