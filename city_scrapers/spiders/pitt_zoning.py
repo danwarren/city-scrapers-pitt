@@ -93,7 +93,7 @@ def PDFtxtFromResponse(response):
     """ Extract the text from all pages of a web hosted PDF
         Return a dict with cleaned up strings for each page
     """
-    output = {'title':'','pages':{}}
+    output = {'title': '', 'pages': {}}
     tempFilePDF = TemporaryFile()
     tempFilePDF.write(response.body)
     PFR = PdfFileReader(tempFilePDF)
