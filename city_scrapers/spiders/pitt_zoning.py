@@ -160,7 +160,7 @@ class PittZoningSpider(CityScrapersSpider):
         self.logger.debug('Parse_PDF function called on %s', response.url)
         resp = PDFtxtFromResponse(response)
         Pages = resp['pages']
-        title = resp['title']
+        # title = resp['title']
         default_title = response.meta['title']
         if not default_title:
             default_title = "Unknown Title"
