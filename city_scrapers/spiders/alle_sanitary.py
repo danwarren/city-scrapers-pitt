@@ -1,6 +1,23 @@
+import datetime
+
 from city_scrapers_core.constants import NOT_CLASSIFIED
 from city_scrapers_core.items import Meeting
 from city_scrapers_core.spiders import CityScrapersSpider
+
+month_lookup = {
+    'April': 4,
+    'December': 12,
+    'March': 3,
+    'October': 10,
+    'September': 9,
+    'August': 8,
+    'February': 2,
+    'May': 5,
+    'January': 1,
+    'November': 11,
+    'June': 6,
+    'July': 7,
+}
 
 
 class AlleSanitarySpider(CityScrapersSpider):
@@ -8,9 +25,10 @@ class AlleSanitarySpider(CityScrapersSpider):
     agency = "Allegheny County Sanitary Authority (ALCOSAN)"
     timezone = "America/New_York"
     allowed_domains = ["www.alcosan.org"]
-    start_urls = ["http://www.alcosan.org/BoardofDirectors/2015MeetingSchedule/tabid/195/Default.aspx"]
+    site = "http://www.alcosan.org/BoardofDirectors"
+    start_urls = [site + "/2015MeetingSchedule/tabid/195/Default.aspx"]
 
-# Xcode for dates div //div[@class="Normal"]/p
+    # Xcode for dates div //div[@class="Normal"]/p
 
     def parse(self, response):
         """
@@ -19,32 +37,34 @@ class AlleSanitarySpider(CityScrapersSpider):
         Change the `_parse_title`, `_parse_start`, etc methods to fit your scraping
         needs.
         """
-        for item in response.css(".meetings"):
-            meeting = Meeting(
-                title=self._parse_title(item),
-                description=self._parse_description(item),
-                classification=self._parse_classification(item),
-                start=self._parse_start(item),
-                end=self._parse_end(item),
-                all_day=self._parse_all_day(item),
-                time_notes=self._parse_time_notes(item),
-                location=self._parse_location(item),
-                links=self._parse_links(item),
-                source=self._parse_source(response),
-            )
+        dates = response.xpath("//p").extract()[0].split('<br>\r\n')
+        for item in dates:
+            if 'day' in item:
+                meeting = Meeting(
+                    title=self._parse_title(item),
+                    description=self._parse_description(item),
+                    classification=self._parse_classification(item),
+                    start=self._parse_start(item),
+                    end=self._parse_end(item),
+                    all_day=self._parse_all_day(item),
+                    time_notes=self._parse_time_notes(item),
+                    location=self._parse_location(item),
+                    links=self._parse_links(item),
+                    source=self._parse_source(response),
+                )
 
-            meeting["status"] = self._get_status(meeting)
-            meeting["id"] = self._get_id(meeting)
+                meeting["status"] = self._get_status(meeting)
+                meeting["id"] = self._get_id(meeting)
 
-            yield meeting
+                yield meeting
 
     def _parse_title(self, item):
         """Parse or generate meeting title."""
-        return "ALCOSAN Borad Meeting"
+        return "ALCOSAN Board Meeting"
 
     def _parse_description(self, item):
         """Parse or generate meeting description."""
-        return ""
+        return "board meeting"
 
     def _parse_classification(self, item):
         """Parse or generate classification from allowed options."""
@@ -52,7 +72,11 @@ class AlleSanitarySpider(CityScrapersSpider):
 
     def _parse_start(self, item):
         """Parse start datetime as a naive datetime object."""
-        return None
+        dow, date, year = item.split(",")
+        month, day = date.split()
+        year = year.split("\\")[0]
+        month = month_lookup[month]
+        return datetime.datetime(int(year), int(month), int(day), 16, 30)
 
     def _parse_end(self, item):
         """Parse end datetime as a naive datetime object. Added by pipeline if None"""
