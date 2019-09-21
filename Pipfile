@@ -12,6 +12,7 @@ python-dateutil = "*"
 PyPDF2 = "==1.26.0"
 city-scrapers-core = {extras = ["aws"],version = "*"}
 scrapy-sentry = "*"
+city-scrapers-core = "*"
 
 [dev-packages]
 freezegun = "*"
