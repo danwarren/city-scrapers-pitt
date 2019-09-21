@@ -61,16 +61,6 @@ parsed_items = [item for item in spider.parse_PDF(test_response)]
 freezer.stop()
 
 
-def test_tests():
-    print("Please write some tests for this spider.")
-    assert True
-
-
-"""
-Uncomment below
-"""
-
-
 def test_title():
     assert "zoning" in parsed_items[0]["title"].lower()
 
