@@ -7,19 +7,16 @@ name = "pypi"
 requests = "*"
 twisted = ">=18.9.0"
 scrapy = "*"
-legistar = {git = "https://github.com/opencivicdata/python-legistar-scraper"}
 python-dateutil = "*"
 PyPDF2 = "==1.26.0"
 city-scrapers-core = {extras = ["aws"],version = "*"}
 scrapy-sentry = "*"
-city-scrapers-core = "*"
-
+city-scrapers-core = {extras = ["aws"],version = "*"}
+legistar = {git = "https://github.com/opencivicdata/python-legistar-scraper"}
+    
 [dev-packages]
 freezegun = "*"
 pytest = "*"
 "flake8" = "*"
 isort = "*"
 yapf = "*"
-
-[pipenv]
-allow_prereleases = true

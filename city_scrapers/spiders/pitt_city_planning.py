@@ -6,10 +6,10 @@ from city_scrapers_core.items import Meeting
 from city_scrapers_core.spiders import CityScrapersSpider
 
 
-class CityPlanningSpider(CityScrapersSpider):
-    name = "city_planning"
+class PittCityPlanningSpider(CityScrapersSpider):
+    name = "pitt_city_planning"
     agency = "City Of Pittsburgh Planning Commission Notices"
-    timezone = "America/Chicago"
+    timezone = "America/New_York"
     allowed_domains = ["pittsburghpa.gov"]
     start_urls = ["http://pittsburghpa.gov/dcp/notices"]
 
