@@ -9,7 +9,6 @@ twisted = ">=18.9.0"
 scrapy = "*"
 python-dateutil = "*"
 PyPDF2 = "==1.26.0"
-city-scrapers-core = {extras = ["aws"],version = "*"}
 scrapy-sentry = "*"
 city-scrapers-core = {extras = ["aws"],version = "*"}
 legistar = {git = "https://github.com/opencivicdata/python-legistar-scraper"}
